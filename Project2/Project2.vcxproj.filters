@@ -19,4 +19,8 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="shader.vert" />
+    <CopyFileToFolders Include="shader.frag" />
+  </ItemGroup>
 </Project>
