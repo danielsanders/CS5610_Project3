@@ -14,20 +14,20 @@
 #define WINDOW_WIDTH 1024
 #define WINDOW_HEIGHT 768
 
+static std::string ExecutableDirectory;
+
 static GLuint ShaderProgram;
 static GLint mvpUniformLocation;
-
-static cyMatrix4f mvpMatrix;
 
 //Camera distance changing.
 #define CAMERA_MINIMUM_DISTANCE 12.0f
 #define CAMERA_MAXIMUM_DISTANCE 200.0f
 static float cameraDistance = 25.0f;
 static bool draggingMouseWithRMB = false;
-static double lastRMBPosition;
+static double lastRMBPositionY;
 static float distancePerPixel = 0.05;
 
-//Camera distance changing
+//Camera angle changing
 static float cameraAngleX = 0.0f;
 static float cameraAngleY = 0.0f;
 static bool draggingMouseWithLMB = false;
@@ -35,14 +35,13 @@ static float angleChangePerPixel = 0.005;
 static double lastLMBPositionX;
 static double lastLMBPositionY;
 
-
-static bool RecompileShadersAndGetUniformLocations()
+static bool CompileShadersAndGetUniformLocations()
 {
     bool success = false;
     char infoLog[512];
-    std::ifstream vertInput("shader.vert");
-    //char* absolutePath = _fullpath(NULL, "shader.vert", 1000000);
-    //fprintf(stdout, absolutePath);
+    std::string vertexShaderPath(ExecutableDirectory);
+    vertexShaderPath.append("\\shader.vert");
+    std::ifstream vertInput(vertexShaderPath);
     std::stringstream vertexStringBuffer;
     vertexStringBuffer << vertInput.rdbuf();
     std::string vertexShaderString = vertexStringBuffer.str();
@@ -59,7 +58,9 @@ static bool RecompileShadersAndGetUniformLocations()
         fprintf(stderr, "Failed to compile vertex shader. Error: %s\n", infoLog);
     }
 
-    std::ifstream fragInput("shader.frag");
+    std::string fragShaderPath(ExecutableDirectory);
+    fragShaderPath.append("\\shader.frag");
+    std::ifstream fragInput(fragShaderPath);
     std::stringstream fragStringBuffer;
     fragStringBuffer << fragInput.rdbuf();
     std::string fragShaderString = fragStringBuffer.str();
@@ -111,6 +112,17 @@ static bool RecompileShadersAndGetUniformLocations()
     return success;
 }
 
+static bool RecompileShadersAndGetUniformLocations()
+{
+    GLuint oldProgram = ShaderProgram;
+    bool success = CompileShadersAndGetUniformLocations();
+    if (success)
+    {
+        glDeleteProgram(oldProgram);
+    }
+    return success;
+}
+
 static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_RELEASE)
@@ -136,7 +148,7 @@ static void mouseButtonCallback(GLFWwindow* window, int button, int action, int 
         draggingMouseWithRMB = (action == GLFW_PRESS);
         if (draggingMouseWithRMB)
         {
-            lastRMBPosition = ypos;
+            lastRMBPositionY = ypos;
         }
     }
     else if (button == GLFW_MOUSE_BUTTON_LEFT)
@@ -166,8 +178,8 @@ static void mousePosCallback(GLFWwindow* window, double xpos, double ypos)
 
     if (draggingMouseWithRMB)
     {
-        double yDifference = ypos - lastRMBPosition;
-        lastRMBPosition = ypos;
+        double yDifference = ypos - lastRMBPositionY;
+        lastRMBPositionY = ypos;
         cameraDistance += yDifference * distancePerPixel;
         if (cameraDistance < CAMERA_MINIMUM_DISTANCE)
         {
@@ -192,6 +204,8 @@ int main(int argc, char* argv[])
         fprintf(stderr, "Requires a single argument for the obj file location\n");
         return 0;
     }
+    std::string exePath(argv[0]);
+    ExecutableDirectory = std::string(exePath.substr(0, exePath.find_last_of('\\')));
 
     glfwSetErrorCallback(errorCallback);
 
@@ -213,7 +227,6 @@ int main(int argc, char* argv[])
     GLenum err = glewInit();
     if (GLEW_OK != err)
     {
-        /* Problem: glewInit failed, something is seriously wrong. */
         fprintf(stderr, "GLEW Error: %s\n", glewGetErrorString(err));
         return -1;
     }
@@ -236,7 +249,7 @@ int main(int argc, char* argv[])
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
 
-    bool success = RecompileShadersAndGetUniformLocations();
+    bool success = CompileShadersAndGetUniformLocations();
 
     if (!success)
     {
@@ -263,26 +276,25 @@ int main(int argc, char* argv[])
 
     float fov = 1.570796326; //pi/2 radians
     float aspectRatio = (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT;
-    
+
+    cyMatrix4f perspectiveTransform = cyMatrix4f::Perspective(fov, aspectRatio, 1, 1000.0);
+
+    mesh.ComputeBoundingBox();
+    cyVec3f center = (mesh.GetBoundMax() + mesh.GetBoundMin()) / 2;
+
     while (!glfwWindowShouldClose(window))
     {
         glClear(GL_COLOR_BUFFER_BIT);
 
-       // cameraAngleX += 0.005f;
+        cyMatrix4f modelTransform = cyMatrix4f::Translation(-1 * center);
 
-        cyMatrix4f modelTransform = cyMatrix4f::Translation(cyVec3f(0.0, 0.0, 0.0f)) * cyMatrix4f::RotationX(-fov);
-        cyVec4f cameraPosition(0, 0, -1 * cameraDistance, 1.0f);
-        cameraPosition = cyMatrix4f::RotationX(cameraAngleX) * cyMatrix4f::RotationY(cameraAngleY) * cameraPosition;
+        cyMatrix4f cameraTransform = cyMatrix4f::Translation(cyVec3f(0,0,-cameraDistance)) * cyMatrix4f::RotationY(-cameraAngleY)* cyMatrix4f::RotationX(-cameraAngleX);
 
-        cyMatrix4f cameraTransform = cyMatrix4f::View(cyVec3f(cameraPosition.x, cameraPosition.y, cameraPosition.z), cyVec3f(0, 0, 0), cyVec3f(0, 1, 0));
-
-        cyMatrix4f perspectiveTransform = cyMatrix4f::Perspective(fov, aspectRatio, 1, 1000.0);
-
-
-        mvpMatrix = perspectiveTransform * cameraTransform * modelTransform;
+        cyMatrix4f mvpMatrix = perspectiveTransform * cameraTransform * modelTransform;
 
         glBindVertexArray(vao);
         glUseProgram(ShaderProgram);
+
         float mvpMatrixValues[4][4];
         mvpMatrix.Get(&mvpMatrixValues[0][0]);
 
