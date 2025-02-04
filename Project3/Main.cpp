@@ -27,25 +27,51 @@ static GLint mvpUniformLocation;
 #define CAMERA_MINIMUM_DISTANCE 12.0f
 #define CAMERA_MAXIMUM_DISTANCE 200.0f
 static float cameraDistance = 25.0f;
-static bool draggingMouseWithRMB = false;
-static double lastRMBPositionY;
 static float distancePerPixel = 0.05f;
 
 //Camera angle changing
 static float cameraAngleX = 0.0f;
 static float cameraAngleY = 0.0f;
-static bool draggingMouseWithLMB = false;
 static float angleChangePerPixel = 0.005f;
+
+//Light angle changes
+static float lightAngleX = 0.0f;
+static float lightAngleY = 0.0f;
+static float lightDistanceFromOrigin = 20.0f;
+
+//Mouse input tracking
+static bool draggingMouseWithLMB = false;
+static bool draggingMouseWithRMB = false;
+static bool shiftHeldDown = false;
+static double lastRMBPositionY;
 static double lastLMBPositionX;
 static double lastLMBPositionY;
 
 
+static PointLight light;
+
+
 static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_RELEASE)
+    if ((key == GLFW_KEY_RIGHT_SHIFT || key == GLFW_KEY_LEFT_SHIFT)
+        && (action == GLFW_PRESS || action == GLFW_RELEASE))
+    {
+        shiftHeldDown = (action == GLFW_PRESS);
+    }
+    else if (key == GLFW_KEY_ESCAPE && action == GLFW_RELEASE)
     {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
+}
+
+static cyVec4f calculatePosition(float angleX, float angleY, float distance)
+{
+    cyVec4f position(0, 0, 0, 1);
+    
+    position = cyMatrix4f::RotationY(angleY) * 
+        cyMatrix4f::RotationX(angleX) *
+        cyMatrix4f::Translation(cyVec3f(0, 0, distance)) * position;
+    return position;
 }
 
 static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
@@ -77,12 +103,21 @@ static void mousePosCallback(GLFWwindow* window, double xpos, double ypos)
     {
         double xDifference = xpos - lastLMBPositionX;
         lastLMBPositionX = xpos;
-        cameraAngleY -= xDifference * angleChangePerPixel;
-
 
         double yDifference = ypos - lastLMBPositionY;
         lastLMBPositionY = ypos;
-        cameraAngleX -= yDifference * angleChangePerPixel;
+
+        if (shiftHeldDown)
+        {
+            lightAngleY += xDifference * angleChangePerPixel;
+            lightAngleX += yDifference * angleChangePerPixel;
+            light.LightPosition = calculatePosition(lightAngleX, lightAngleY, lightDistanceFromOrigin);
+        }
+        else
+        {
+            cameraAngleY -= xDifference * angleChangePerPixel;
+            cameraAngleX -= yDifference * angleChangePerPixel;
+        }
     }
 
     if (draggingMouseWithRMB)
@@ -100,6 +135,7 @@ static void mousePosCallback(GLFWwindow* window, double xpos, double ypos)
         }
     }
 }
+
 
 static void errorCallback(int error, const char* description)
 {
@@ -152,8 +188,7 @@ int main(int argc, char* argv[])
     std::string vertexShaderPath(ExecutableDirectory);
     vertexShaderPath.append("\\shader.vert");
 
-    PointLight light;
-    light.LightPosition = cyVec4f(0.0, 0.0, 20.0, 1.0);
+    light.LightPosition = calculatePosition(0.0f, 0.0f, lightDistanceFromOrigin);
     light.LightIntensity = 1.0f;
 
     Material material;
