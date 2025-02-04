@@ -12,6 +12,8 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include "RenderableObject.h"
+#include "PointLight.h"
+#include "Shader.h"
 
 #define WINDOW_WIDTH 1024
 #define WINDOW_HEIGHT 768
@@ -150,22 +152,37 @@ int main(int argc, char* argv[])
     std::string vertexShaderPath(ExecutableDirectory);
     vertexShaderPath.append("\\shader.vert");
 
-    RenderableObject renderable(argv[1], vertexShaderPath, fragShaderPath);;
-    
+    PointLight light;
+    light.LightPosition = cyVec4f(0.0, 0.0, 20.0, 1.0);
+    light.LightIntensity = 1.0f;
+
+    Material material;
+
+    material.AmbientDiffuseColor = cyVec4f(0, 0.5, 0, 1.0);
+    float ambientIntensity = 0.1f;
+    material.SpecularShininess = 10;
+    material.SpecularColor = cyVec4f(1.0, 1.0, 1.0, 1.0);
+
+    RenderableObject renderable(argv[1], &material);
+    renderable.CenterOnBoundingBox = true;
+
+    Shader shader(vertexShaderPath, fragShaderPath);
+
     float fov = 1.570796326f; //pi/2 radians
     float aspectRatio = (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT;
-
     cyMatrix4f perspectiveTransform = cyMatrix4f::Perspective(fov, aspectRatio, 1, 1000.0);
 
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
 
     while (!glfwWindowShouldClose(window))
     {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        cyMatrix4f cameraTransform = cyMatrix4f::Translation(cyVec3f(0,0,-cameraDistance)) * cyMatrix4f::RotationY(-cameraAngleY)* cyMatrix4f::RotationX(-cameraAngleX);
-
-        renderable.Draw(cameraTransform, perspectiveTransform);
+        cyMatrix4f cameraTransform = cyMatrix4f::Translation(cyVec3f(0,0,-cameraDistance)) * cyMatrix4f::RotationY(-cameraAngleY) * cyMatrix4f::RotationX(-cameraAngleX);
+        cyMatrix4f cameraPositionTransform = cyMatrix4f::Translation(cyVec3f(0, 0, cameraDistance)) * cyMatrix4f::RotationY(cameraAngleY) * cyMatrix4f::RotationX(cameraAngleX);
+        cyVec4f cameraPosition = cameraPositionTransform * cyVec4f(0.0, 0.0, 0.0, 1.0);
+        shader.Draw(&renderable, &light, cameraTransform, perspectiveTransform, cameraPosition, ambientIntensity);
 
         glfwSwapBuffers(window);
 

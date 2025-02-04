@@ -15,7 +15,7 @@ struct ObjFileIndexData
 	int UVPositionIndex;
 };
 
-RenderableObject::RenderableObject(char* objFilename, std::string vertexShaderFilename, std::string fragShaderFilename)
+RenderableObject::RenderableObject(char* objFilename, Material * material)
 {
 	Position = cyVec3f(0, 0, 0);
 	Scale = cyVec3f(1, 1, 1);
@@ -24,132 +24,30 @@ RenderableObject::RenderableObject(char* objFilename, std::string vertexShaderFi
 	glGenVertexArrays(1, &VAO);
 	glBindVertexArray(VAO);
 	
-	CompileShaders(vertexShaderFilename, fragShaderFilename);
+	ObjectMaterial = material;
 
 	InitializeFromObjFile(objFilename);
 
 }
 
-void RenderableObject::CalculateModelTransform()
+cyMatrix4f RenderableObject::CalculateModelTransform()
 {
-	ModelTransform = cyMatrix4f::Identity();
+	cyMatrix4f modelTransform = cyMatrix4f::Identity();
 	if (CenterOnBoundingBox)
 	{
-		ModelTransform = cyMatrix4f::Translation(-BoundingBoxCenter) * ModelTransform;
+		modelTransform = cyMatrix4f::Translation(-BoundingBoxCenter) * modelTransform;
 	}
-	ModelTransform = cyMatrix4f::Translation(Position) * cyMatrix4f::Scale(Scale) *
+	modelTransform = cyMatrix4f::Translation(Position) * cyMatrix4f::Scale(Scale) *
 		cyMatrix4f::RotationX(RotationAngles.x) * cyMatrix4f::RotationY(RotationAngles.y) * 
-		cyMatrix4f::RotationZ(RotationAngles.z) * ModelTransform;
+		cyMatrix4f::RotationZ(RotationAngles.z) * modelTransform;
+	return modelTransform;
 }
 
-void RenderableObject::Draw(cyMatrix4f cameraTransform, cyMatrix4f perspectiveTransform)
+void RenderableObject::Draw()
 {
 	glBindVertexArray(VAO);
-	glUseProgram(ShaderProgram);
-
-	CalculateModelTransform();
-
-	cyMatrix4f mvpMatrix = perspectiveTransform* cameraTransform* ModelTransform;
-	float mvpMatrixValues[4][4];
-	mvpMatrix.Get(&mvpMatrixValues[0][0]);
-	glUniformMatrix4fv(MVPUniformLocation, 1, GL_FALSE, &mvpMatrixValues[0][0]);
-
-	cyMatrix4f mvMatrix = cameraTransform * ModelTransform;
-	float mvMatrixValues[4][4];
-	mvMatrix.Get(&mvMatrixValues[0][0]);
-	//glUniformMatrix4fv(MVUniformLocation, 1, GL_FALSE, &mvMatrixValues[0][0]);
-
-	cyMatrix3f mvNormalMatrix = mvMatrix.GetSubMatrix3();
-	mvNormalMatrix.Invert();
-	mvNormalMatrix.Transpose();	
-	float mvnMatrixValues[3][3];
-	mvNormalMatrix.Get(&mvnMatrixValues[0][0]);
-	glUniformMatrix3fv(MVNUniformLocation, 1, GL_FALSE, &mvnMatrixValues[0][0]);
 
 	glDrawElements(GL_TRIANGLES, IndexBufferCount, GL_UNSIGNED_INT, 0);
-
-}
-
-int RenderableObject::CompileShaders(std::string vertexShaderFilename, std::string fragShaderFilename)
-{
-	char infoLog[512];
-	std::ifstream vertInput(vertexShaderFilename);
-	std::stringstream vertexStringBuffer;
-	vertexStringBuffer << vertInput.rdbuf();
-	std::string vertexShaderString = vertexStringBuffer.str();
-	GLchar const* vertexShaderSource = vertexShaderString.c_str();
-	GLuint vertexShader;
-	vertexShader = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-	glCompileShader(vertexShader);
-	int vertexSuccess;
-	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &vertexSuccess);
-	if (!vertexSuccess)
-	{
-		glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-		fprintf(stderr, "Failed to compile vertex shader. Error: %s\n", infoLog);
-	}
-
-	std::ifstream fragInput(fragShaderFilename);
-	std::stringstream fragStringBuffer;
-	fragStringBuffer << fragInput.rdbuf();
-	std::string fragShaderString = fragStringBuffer.str();
-	GLchar const* fragShaderSource = fragShaderString.c_str();
-	GLuint fragShader;
-	fragShader = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fragShader, 1, &fragShaderSource, NULL);
-	glCompileShader(fragShader);
-	int fragSuccess;
-	glGetShaderiv(fragShader, GL_COMPILE_STATUS, &fragSuccess);
-	if (!fragSuccess)
-	{
-		glGetShaderInfoLog(fragShader, 512, NULL, infoLog);
-		fprintf(stderr, "Failed to compile fragment shader. Error: %s\n", infoLog);
-	}
-
-	if (vertexSuccess && fragSuccess)
-	{
-		GLuint newShaderProgram;
-		newShaderProgram = glCreateProgram();
-		glAttachShader(newShaderProgram, vertexShader);
-		glAttachShader(newShaderProgram, fragShader);
-		glLinkProgram(newShaderProgram);
-		int linkSuccess;
-		glGetProgramiv(newShaderProgram, GL_LINK_STATUS, &linkSuccess);
-		if (!linkSuccess)
-		{
-			glGetProgramInfoLog(newShaderProgram, 512, NULL, infoLog);
-			fprintf(stderr, "Failed to link shaders. Error: %s\n", infoLog);
-			return -1;
-		}
-		else
-		{
-			GLint mvpLoc = glGetUniformLocation(newShaderProgram, "mvp");
-			//GLint mvLoc = glGetUniformLocation(newShaderProgram, "mv");
-			GLint mvnLoc = glGetUniformLocation(newShaderProgram, "mvn");
-			if (mvpLoc == -1 /* || mvLoc == -1 */|| mvnLoc == -1)
-			{
-				fprintf(stderr, "Could not get a uniform location.\n");
-				return -1;
-			}
-			else
-			{
-				MVPUniformLocation = mvpLoc;
-				//MVUniformLocation = mvLoc;
-				MVNUniformLocation = mvnLoc;
-				ShaderProgram = newShaderProgram;
-			}
-		}
-	}
-	else
-	{
-		return -1;
-	}
-
-	glDeleteShader(vertexShader);
-	glDeleteShader(fragShader);
-
-	return 0;
 
 }
 

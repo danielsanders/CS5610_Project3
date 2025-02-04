@@ -6,24 +6,26 @@
 #include "GL/glew.h"
 #include "GLFW/glfw3.h"
 #include "cyMatrix.h"
+#include "Material.h"
 
 
 class RenderableObject
 {
 public:
-	RenderableObject(char* objFilename, std::string vertexShaderFilename, std::string fragShaderFilename);
+	RenderableObject(char* objFilename, Material* material);
 
-	void Draw(cyMatrix4f cameraTransform, cyMatrix4f perspectiveTransform);
+	void Draw();
 
 	cyVec3f Position;
 	cyVec3f Scale;
 	cyVec3f RotationAngles;
-
 	bool CenterOnBoundingBox;
 
-private:
+	Material* ObjectMaterial;
 
-	void CalculateModelTransform();
+	cyMatrix4f CalculateModelTransform();
+
+private:
 
 	int InitializeFromObjFile(char* filename);
 	int CompileShaders(std::string vertexShaderFilename, std::string fragShaderFilename);
@@ -35,15 +37,7 @@ private:
 	GLuint VertexNormalElementBufferObject;
 	GLuint VertexUVElementBufferObject;
 
-	GLuint ShaderProgram;
-	GLint MVPUniformLocation;
-	GLint MVUniformLocation;
-	GLint MVNUniformLocation;
-
-	cyMatrix4f ModelTransform;
 	cyVec3f BoundingBoxCenter;
 	
-
-
 };
 
