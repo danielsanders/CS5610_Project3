@@ -43,7 +43,7 @@ static float lightDistanceFromOrigin = 20.0f;
 //Mouse input tracking
 static bool draggingMouseWithLMB = false;
 static bool draggingMouseWithRMB = false;
-static bool shiftHeldDown = false;
+static bool controlHeldDown = false;
 static double lastRMBPositionY;
 static double lastLMBPositionX;
 static double lastLMBPositionY;
@@ -55,10 +55,10 @@ static Camera camera;
 
 static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-    if ((key == GLFW_KEY_RIGHT_SHIFT || key == GLFW_KEY_LEFT_SHIFT)
+    if ((key == GLFW_KEY_RIGHT_CONTROL || key == GLFW_KEY_LEFT_CONTROL)
         && (action == GLFW_PRESS || action == GLFW_RELEASE))
     {
-        shiftHeldDown = (action == GLFW_PRESS);
+        controlHeldDown = (action == GLFW_PRESS);
     }
     else if (key == GLFW_KEY_ESCAPE && action == GLFW_RELEASE)
     {
@@ -106,7 +106,7 @@ static void mousePosCallback(GLFWwindow* window, double xpos, double ypos)
         double yDifference = ypos - lastLMBPositionY;
         lastLMBPositionY = ypos;
 
-        if (shiftHeldDown)
+        if (controlHeldDown)
         {
             lightAngleY += xDifference * angleChangePerPixel;
             lightAngleX += yDifference * angleChangePerPixel;
