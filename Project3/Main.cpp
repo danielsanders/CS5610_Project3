@@ -14,6 +14,7 @@
 #include "RenderableObject.h"
 #include "PointLight.h"
 #include "Shader.h"
+#include "Camera.h"
 
 #define WINDOW_WIDTH 1024
 #define WINDOW_HEIGHT 768
@@ -49,6 +50,7 @@ static double lastLMBPositionY;
 
 
 static PointLight light;
+static Camera camera;
 
 
 static void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -64,14 +66,11 @@ static void keyCallback(GLFWwindow* window, int key, int scancode, int action, i
     }
 }
 
-static cyVec4f calculatePosition(float angleX, float angleY, float distance)
+static cyMatrix4f calculateOffsetAndAnglesTransform(float angleX, float angleY, float distance)
 {
-    cyVec4f position(0, 0, 0, 1);
-    
-    position = cyMatrix4f::RotationY(angleY) * 
+    return cyMatrix4f::RotationY(angleY) * 
         cyMatrix4f::RotationX(angleX) *
-        cyMatrix4f::Translation(cyVec3f(0, 0, distance)) * position;
-    return position;
+        cyMatrix4f::Translation(cyVec3f(0, 0, distance));
 }
 
 static void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
@@ -111,12 +110,17 @@ static void mousePosCallback(GLFWwindow* window, double xpos, double ypos)
         {
             lightAngleY += xDifference * angleChangePerPixel;
             lightAngleX += yDifference * angleChangePerPixel;
-            light.LightPosition = calculatePosition(lightAngleX, lightAngleY, lightDistanceFromOrigin);
+            light.LightPosition = calculateOffsetAndAnglesTransform(lightAngleX, lightAngleY, lightDistanceFromOrigin) * cyVec4f(0,0,0,1);
         }
         else
         {
             cameraAngleY -= xDifference * angleChangePerPixel;
             cameraAngleX -= yDifference * angleChangePerPixel;
+            cyMatrix4f cameraToWorldTransform = calculateOffsetAndAnglesTransform(cameraAngleX, cameraAngleY, cameraDistance);
+            camera.Position = cameraToWorldTransform * cyVec4f(0, 0, 0, 1);
+            camera.Forward = -camera.Position; //Origin - position
+            camera.Forward.Normalize();
+            camera.Up = cameraToWorldTransform * cyVec4f(0, 1, 0, 0);
         }
     }
 
@@ -188,8 +192,14 @@ int main(int argc, char* argv[])
     std::string vertexShaderPath(ExecutableDirectory);
     vertexShaderPath.append("\\shader.vert");
 
-    light.LightPosition = calculatePosition(0.0f, 0.0f, lightDistanceFromOrigin);
+    light.LightPosition = calculateOffsetAndAnglesTransform(0.0f, 0.0f, lightDistanceFromOrigin) * cyVec4f(0,0,0,1);
     light.LightIntensity = 1.0f;
+
+    cyMatrix4f cameraToWorldTransform = calculateOffsetAndAnglesTransform(cameraAngleX, cameraAngleY, cameraDistance);
+    camera.Position = cameraToWorldTransform * cyVec4f(0, 0, 0, 1);
+    camera.Forward = -camera.Position; //Origin - position
+    camera.Forward.Normalize();
+    camera.Up = cameraToWorldTransform * cyVec4f(0, 1, 0, 0);
 
     Material material;
 
@@ -199,6 +209,7 @@ int main(int argc, char* argv[])
     material.SpecularColor = cyVec4f(1.0, 1.0, 1.0, 1.0);
 
     RenderableObject renderable(argv[1], &material);
+    renderable.RotationAngles = cyVec3f( -1.570796326f,0, 0);
     renderable.CenterOnBoundingBox = true;
 
     Shader shader(vertexShaderPath, fragShaderPath);
@@ -214,10 +225,7 @@ int main(int argc, char* argv[])
     {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        cyMatrix4f cameraTransform = cyMatrix4f::Translation(cyVec3f(0,0,-cameraDistance)) * cyMatrix4f::RotationY(-cameraAngleY) * cyMatrix4f::RotationX(-cameraAngleX);
-        cyMatrix4f cameraPositionTransform = cyMatrix4f::Translation(cyVec3f(0, 0, cameraDistance)) * cyMatrix4f::RotationY(cameraAngleY) * cyMatrix4f::RotationX(cameraAngleX);
-        cyVec4f cameraPosition = cameraPositionTransform * cyVec4f(0.0, 0.0, 0.0, 1.0);
-        shader.Draw(&renderable, &light, cameraTransform, perspectiveTransform, cameraPosition, ambientIntensity);
+        shader.Draw(&renderable, &light, &camera, perspectiveTransform, ambientIntensity);
 
         glfwSwapBuffers(window);
 

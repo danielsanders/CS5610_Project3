@@ -2,8 +2,10 @@
 #include <cyMatrix.h>
 class Camera
 {
-	cyVec3f Position;
-	cyVec3f RotationAngles;
+public:
+	cyVec4f Position;
+	cyVec4f Forward;
+	cyVec4f Up;
 
 	cyMatrix4f GetCameraTransform();
 };

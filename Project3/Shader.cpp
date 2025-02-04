@@ -8,9 +8,10 @@ Shader::Shader(std::string vertexShaderFilename, std::string fragShaderFilename)
 	CompileShaders(vertexShaderFilename, fragShaderFilename);
 }
 
-void Shader::Draw(RenderableObject* object, PointLight* light, cyMatrix4f cameraTransform, cyMatrix4f projectionTransform, cyVec4f cameraPosition, float ambientLightIntensity)
+void Shader::Draw(RenderableObject* object, PointLight* light, Camera* camera, cyMatrix4f projectionTransform, float ambientLightIntensity)
 {
 	cyMatrix4f modelTransform = object->CalculateModelTransform();
+	cyMatrix4f cameraTransform = camera->GetCameraTransform();
 
 	glUseProgram(ShaderProgram);
 
@@ -39,7 +40,7 @@ void Shader::Draw(RenderableObject* object, PointLight* light, cyMatrix4f camera
 	glUniform1f(LightIntensityLocation, light->LightIntensity);
 	cyVec4f lightPositionInViewSpace = cameraTransform * light->LightPosition;
 	glUniform3fv(LightPositionLocation, 1, &lightPositionInViewSpace[0]);
-	glUniform3fv(CameraPositionLocation, 1, &cameraPosition[0]);
+	glUniform3fv(CameraPositionLocation, 1, &camera->Position[0]);
 	object->Draw();
 }
 

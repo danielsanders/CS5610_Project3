@@ -9,13 +9,14 @@
 #include "GLFW/glfw3.h"
 #include "PointLight.h"
 #include "RenderableObject.h"
+#include "Camera.h"
 
 class Shader
 {
 public:
 	Shader(std::string vertexShaderFilename, std::string fragShaderFilename);
 
-	void Draw(RenderableObject* object, PointLight* light, cyMatrix4f cameraTransform, cyMatrix4f projectionTransform, cyVec4f cameraPosition, float ambientLightIntensity);
+	void Draw(RenderableObject* object, PointLight* light, Camera* camera, cyMatrix4f projectionTransform, float ambientLightIntensity);
 
 private:
 
